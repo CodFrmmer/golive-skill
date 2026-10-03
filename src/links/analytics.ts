@@ -4,6 +4,7 @@ import type { EnvMapping } from '../core/envmap.js';
 import { fingerprint } from '../core/secret.js';
 import { repoIdentity } from '../core/repo.js';
 import { analyticsOf, posthogIngestHost, regionOf, type AnalyticsProvider } from '../adapters/posthog.js';
+import { monitoringOf } from '../adapters/sentry.js';
 import { authOf, decideEnv, deps, envPreview, errMsg, intentOf, mappedEnv, memo, observeNames, projectIntent, ready, step, track, verifyEnvWritten, writeEnv, writesProduction } from './util.js';
 
 type Target = Exclude<EnvTarget, 'development'>;
@@ -41,9 +42,11 @@ export const analyticsLink: Link = {
     if (!r) return null;
     const adapter = r.adapter;
     const provider = analyticsOf(adapter);
-    // An automated monitoring adapter without a capture/read-back surface has nothing golive could
-    // verify, so nothing is planned and the reason is said out loud.
+    // A monitoring adapter with the other capture/read-back shape (Sentry's store/event read) is
+    // owned by its own link: nothing is said here. An adapter with no surface at all has nothing
+    // golive could verify, so nothing is planned and the reason is said out loud — once.
     if (!provider) {
+      if (monitoringOf(adapter)) return null;
       return { steps: [], handoffs: [], warnings: [`${adapter.title}: the adapter exposes no capture + read-back surface, so golive cannot wire or verify monitoring for it`] };
     }
 
